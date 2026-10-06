@@ -1,4 +1,4 @@
-import type { WorkerPacketType, WorkerResultType } from "./contracts";
+import { WorkerResult, type WorkerPacketType, type WorkerResultType } from "./contracts";
 
 export const DEFAULT_WORKER_MODEL = "@cf/openai/gpt-oss-20b";
 
@@ -88,11 +88,14 @@ export function parseWorkerModelResponse(raw: unknown, requestId: string): Worke
     throw new Error("Workers AI JSON response is not an object");
   }
 
-  const candidate = parsed as Record<string, unknown>;
-  if (!("request_id" in candidate)) {
-    candidate.request_id = requestId;
+  const validation = WorkerResult.safeParse(parsed);
+  if (!validation.success) {
+    throw new Error("Workers AI returned a schema-invalid worker result: " + validation.error.message);
   }
-  return candidate as WorkerResultType;
+  if (validation.data.request_id !== requestId) {
+    throw new Error("Workers AI returned a mismatched request_id");
+  }
+  return validation.data;
 }
 
 export async function runWorkerModel(
