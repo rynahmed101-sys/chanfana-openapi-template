@@ -115,7 +115,7 @@ describe("Automate worker API", () => {
         request_id: "wrk_test_87654321",
         status: "proposed",
         changes: [
-          { operation: "update", path: "automate/dev/inventory.py", content: "forbidden" },
+          { operation: "update", path: "automate/dev/inventory.py", expected_sha: "0000000000000000000000000000000000000000", content: "forbidden" },
         ],
         tests: [],
         unresolved: ["not run"],
