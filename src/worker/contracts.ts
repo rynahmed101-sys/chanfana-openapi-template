@@ -3,6 +3,7 @@ import { z } from "zod";
 export const WorkerChange = z.object({
   operation: z.enum(["create", "update"]),
   path: z.string().min(1).max(500),
+  expected_sha: z.string().regex(/^[0-9a-f]{40}$/).nullable(),
   content: z.string().max(200_000).nullable().optional(),
   summary: z.string().max(1_000).nullable().optional(),
 });
