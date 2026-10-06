@@ -6,6 +6,7 @@ import { WorkerJobCreate } from "./jobCreate";
 import { WorkerJobRead } from "./jobRead";
 import { WorkerJobResult } from "./jobResult";
 import { requireWorkerAuth } from "../../worker/auth";
+import { WorkerJobExecute } from "./jobExecute";
 
 export const workerRouter = fromHono(new Hono<{ Bindings: Env }>());
 
@@ -14,4 +15,5 @@ workerRouter.use("/jobs/*", requireWorkerAuth);
 workerRouter.post("/jobs", WorkerJobCreate);
 workerRouter.get("/jobs/:id", WorkerJobRead);
 workerRouter.post("/jobs/:id/claim", WorkerJobClaim);
+workerRouter.post("/jobs/:id/execute", WorkerJobExecute);
 workerRouter.post("/jobs/:id/result", WorkerJobResult);
