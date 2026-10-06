@@ -24,7 +24,7 @@ describe("verification envelope", () => {
     expect(VerificationJobEnvelope.safeParse(bad).success).toBe(false);
   });
   it("rejects an endpoint without a URL and an excessive budget", () => {
-    expect(validateVerificationJobEnvelope({ ...valid, verifier_endpoint: "https://automate.example/verification" } as unknown)).not.toThrow();
+    expect(() => validateVerificationJobEnvelope({ ...valid, verifier_endpoint: "https://automate.example/verification" } as unknown)).not.toThrow();
     expect(validateVerificationJobEnvelope({ ...valid, limits: { deadline_ms: 999_999_999, max_response_bytes: 100_000 } } as unknown)).toThrow();
   });
 });

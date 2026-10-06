@@ -30,6 +30,9 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public async handle(c: HandleArgs[0]) {
     const { body } = await this.getValidatedData<typeof this.schema>();
     const now = new Date().toISOString();
+    const envelope = body as any;
+    const requestId = "packet" in envelope ? envelope.packet.request_id : envelope.request_id;
+    const capabilityId = "packet" in envelope ? envelope.packet.capability.id : envelope.capability_id;
 
     const existing = await c.env.DB.prepare(
       "SELECT id, state, request_id, dispatch_state FROM worker_jobs WHERE request_id = ?1",
