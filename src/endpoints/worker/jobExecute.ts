@@ -2,7 +2,6 @@ import { contentJson, OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { HandleArgs } from "../../types";
 import { WorkerResult } from "../../worker/contracts";
-import { requireWorkerAuth } from "../../worker/auth";
 import { runWorkerModel } from "../../worker/model";
 import { validateWorkerResultAgainstPacket } from "../../worker/guard";
 
