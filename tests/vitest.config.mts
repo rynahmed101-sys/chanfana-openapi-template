@@ -17,12 +17,13 @@ export default defineWorkersConfig({
 			workers: {
 				singleWorker: true,
 				wrangler: {
-					configPath: "../wrangler.jsonc",
+					configPath: "../wrangler.test.jsonc",
 				},
 				miniflare: {
 					compatibilityFlags: ["experimental", "nodejs_compat"],
 					bindings: {
 						MIGRATIONS: migrations,
+						WORKER_API_SECRET: "test-worker-secret",
 					},
 				},
 			},
