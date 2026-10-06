@@ -104,6 +104,13 @@ describe("Automate worker API", () => {
     });
     const job = await create.json<{ jobId: string }>();
 
+    const claim = await SELF.fetch("http://local.test/worker/v1/jobs/" + job.jobId + "/claim", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + secret },
+    });
+    expect(claim.status).toBe(200);
+
+
     const result = await SELF.fetch("http://local.test/worker/v1/jobs/" + job.jobId + "/result", {
       method: "POST",
       headers: {
@@ -126,5 +133,33 @@ describe("Automate worker API", () => {
     const resultBody = await result.json<{ success: boolean; errors: string[] }>();
     expect(resultBody.success).toBe(false);
     expect(resultBody.errors.some((error) => error.includes("outside allowed capability paths"))).toBe(true);
+  });
+
+  it("rejects a result submitted before the job is claimed", async () => {
+    const create = await SELF.fetch("http://local.test/worker/v1/jobs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + secret,
+      },
+      body: JSON.stringify(packet("wrk_test_unclaimed1")),
+    });
+    const job = await create.json<{ jobId: string }>();
+    const result = await SELF.fetch("http://local.test/worker/v1/jobs/" + job.jobId + "/result", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + secret,
+      },
+      body: JSON.stringify({
+        schema_version: "automate.worker_result.v1",
+        request_id: "wrk_test_unclaimed1",
+        status: "proposed",
+        changes: [],
+        tests: [],
+        unresolved: ["not run"],
+      }),
+    });
+    expect(result.status).toBe(409);
   });
 });
