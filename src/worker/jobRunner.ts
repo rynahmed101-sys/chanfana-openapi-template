@@ -37,6 +37,7 @@ export async function runClaimedWorkerJob(
             providers: research.providers,
             limit: research.limits.max_results_per_provider,
             maxResponseBytes: research.limits.max_response_bytes,
+            researchIntent: research.research_intent,
             correlationId: research.provenance.correlation_id,
           }),
           signal: controller.signal,
