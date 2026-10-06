@@ -64,9 +64,13 @@ export class WorkerJobResult extends OpenAPIRoute<HandleArgs> {
       ? "failed"
       : "succeeded";
 
-    await c.env.DB.prepare(
+    const updated = await c.env.DB.prepare(
       "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4 AND state = 'running'"
     ).bind(nextState, JSON.stringify(body), now, params.id).run();
+
+    if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
+      return c.json({ success: false, error: "Worker result lost a concurrent state transition" }, 409);
+    }
 
     return {
       success: true,
