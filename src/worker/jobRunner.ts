@@ -4,6 +4,7 @@ import { validateWorkerResultAgainstPacket } from "./guard";
 import { stateForWorkerResult } from "./state";
 import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./researchEnvelope";
 import { validateVerificationJobEnvelope, type VerificationJobEnvelopeType } from "./verificationEnvelope";
+import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } from "./learningEnvelope";
 
 export async function runClaimedWorkerJob(
   env: Env,
@@ -57,6 +58,28 @@ export async function runClaimedWorkerJob(
       } finally {
         clearTimeout(timer);
       }
+    }
+
+    // Learning handoffs are durable transport objects. Chanfana stores and
+    // returns them but never interprets, verifies, promotes, or certifies the artifact.
+    if (packet?.schema_version === "automate.learning_handoff.v1") {
+      const handoff: LearningHandoffEnvelopeType = validateLearningHandoffEnvelope(packet);
+      const payload = {
+        schema_version: "automate.learning_handoff_ack.v1",
+        authority: "UNTRUSTED_LEARNING_TRANSPORT_ACK",
+        request_id: handoff.request_id,
+        correlation_id: handoff.correlation_id,
+        artifact_type: handoff.artifact_type,
+        artifact: handoff.artifact,
+        provenance: handoff.provenance,
+        stored_at: new Date().toISOString(),
+      };
+      const now = new Date().toISOString();
+      const updated = await env.DB.prepare(
+        "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
+      ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
+      if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("learning handoff lost its execution lease before persistence");
+      return;
     }
 
     // Research jobs are execution envelopes, not implementation-worker packets.
