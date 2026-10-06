@@ -31,7 +31,7 @@ export const ResearchJobEnvelope = z.object({
   limits: z.object({
     max_results_per_provider: z.number().int().min(1).max(10),
     deadline_ms: z.number().int().min(1_000).max(900_000),
-    max_response_bytes: z.number().int().min(1_024).max(5_000_000),
+    max_response_bytes: z.number().int().min(65_536).max(1_500_000),
   }),
   provenance: z.object({
     capability_id: z.string().min(1).max(128),
