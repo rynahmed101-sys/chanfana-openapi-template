@@ -1,4 +1,4 @@
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 const secret = "test-worker-secret";
@@ -90,7 +90,7 @@ describe("Automate worker API", () => {
       headers: { Authorization: "Bearer " + secret },
     });
     expect(claim.status).toBe(200);
-    expect((await claim.json<{ state: string }>()).state).toBe("running");
+    expect((await claim.json<{ state: string }>()).state).toBe("queued");
   });
 
   it("rejects a result outside the packet boundary", async () => {
@@ -111,6 +111,9 @@ describe("Automate worker API", () => {
     });
     expect(claim.status).toBe(200);
 
+    await env.DB.prepare(
+      "UPDATE worker_jobs SET state = 'running', lease_id = 'test-lease', lease_expires_at = ?1 WHERE id = ?2",
+    ).bind(new Date(Date.now() + 60_000).toISOString(), job.jobId).run();
 
     const result = await SELF.fetch("http://local.test/worker/v1/jobs/" + job.jobId + "/result", {
       method: "POST",
