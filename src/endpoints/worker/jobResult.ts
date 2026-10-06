@@ -24,6 +24,7 @@ export class WorkerJobResult extends OpenAPIRoute<HandleArgs> {
       "400": { description: "Invalid or out-of-scope result" },
       "401": { description: "Unauthorized" },
       "404": { description: "Job not found" },
+      "409": { description: "Job is not running" },
     },
   };
 
@@ -43,6 +44,10 @@ export class WorkerJobResult extends OpenAPIRoute<HandleArgs> {
       packet = parsed.packet;
     } catch {
       return c.json({ success: false, error: "Stored worker packet is invalid" }, 400);
+    }
+
+    if (row.state !== "running") {
+      return c.json({ success: false, error: "Job must be running before a result can be submitted" }, 409);
     }
 
     const errors = validateWorkerResultAgainstPacket(packet, body);
