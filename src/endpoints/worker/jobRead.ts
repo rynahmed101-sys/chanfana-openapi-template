@@ -68,7 +68,13 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
       } catch {
         return c.json({ success: false, error: "Persisted result is malformed JSON" }, 500);
       }
-      resultId = "result_" + row.id + "_attempt_" + String(row.attempt);
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(row.result_json),
+      );
+      resultId = "res_" + Array.from(new Uint8Array(digest))
+        .map((value) => value.toString(16).padStart(2, "0"))
+        .join("");
     }
 
     return {
