@@ -5,6 +5,7 @@ import { stateForWorkerResult } from "./state";
 import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./researchEnvelope";
 import { validateVerificationJobEnvelope, type VerificationJobEnvelopeType } from "./verificationEnvelope";
 import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } from "./learningEnvelope";
+import { storeLearningArtifact } from "./learningLedger";
 
 export async function runClaimedWorkerJob(
   env: Env,
@@ -64,12 +65,15 @@ export async function runClaimedWorkerJob(
     // returns them but never interprets, verifies, promotes, or certifies the artifact.
     if (packet?.schema_version === "automate.learning_handoff.v1") {
       const handoff: LearningHandoffEnvelopeType = validateLearningHandoffEnvelope(packet);
+      const stored = await storeLearningArtifact(env, handoff);
       const payload = {
         schema_version: "automate.learning_handoff_ack.v1",
         authority: "UNTRUSTED_LEARNING_TRANSPORT_ACK",
         request_id: handoff.request_id,
         correlation_id: handoff.correlation_id,
         artifact_type: handoff.artifact_type,
+        artifact_id: stored.id,
+        artifact_sha256: stored.artifact_sha256,
         artifact: handoff.artifact,
         provenance: handoff.provenance,
         stored_at: new Date().toISOString(),
