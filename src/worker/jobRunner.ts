@@ -24,8 +24,11 @@ export async function runClaimedWorkerJob(
     // authenticates, bounds, persists and retries; it never interprets the evidence.
     if (packet?.schema_version === "automate.verification_job.v1") {
       const verification: VerificationJobEnvelopeType = validateVerificationJobEnvelope(packet);
-      if (!env.VERIFICATION_ENGINE_JOB_TOKEN) {
-        throw new Error("Verification engine endpoint is not configured");
+      if (!env.VERIFICATION_ENGINE_JOB_TOKEN || !env.VERIFICATION_ENGINE_ENDPOINT) {
+        throw new Error("Verification engine endpoint or authentication is not configured");
+      }
+      if (verification.verifier_endpoint !== env.VERIFICATION_ENGINE_ENDPOINT) {
+        throw new Error("verification endpoint is not allowlisted");
       }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), verification.limits.deadline_ms);

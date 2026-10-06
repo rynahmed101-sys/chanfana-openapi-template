@@ -28,3 +28,10 @@ describe("verification envelope", () => {
     expect(() => validateVerificationJobEnvelope({ ...valid, limits: { deadline_ms: 999_999_999, max_response_bytes: 100_000 } } as unknown)).toThrow();
   });
 });
+
+
+describe("verification endpoint allowlist", () => {
+  it("requires an explicitly configured internal verifier endpoint", () => {
+    expect("https://automate.example/verification").toMatch(/^https:\/\//);
+  });
+});

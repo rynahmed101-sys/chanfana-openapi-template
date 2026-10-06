@@ -5,6 +5,7 @@ declare global {
     AUTOMATE_JOB_QUEUE: Queue<WorkerJobMessage>;
     MIRROR_RESEARCH_JOB_TOKEN?: string;
     VERIFICATION_ENGINE_JOB_TOKEN?: string;
+    VERIFICATION_ENGINE_ENDPOINT?: string;
   }
 }
 
