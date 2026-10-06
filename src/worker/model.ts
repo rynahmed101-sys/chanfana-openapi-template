@@ -17,10 +17,11 @@ const workerResultSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["operation", "path"],
+        required: ["operation", "path", "expected_sha"],
         properties: {
           operation: { type: "string", enum: ["create", "update"] },
           path: { type: "string" },
+          expected_sha: { type: ["string", "null"], pattern: "^[0-9a-f]{40}$" },
           content: { type: ["string", "null"] },
           summary: { type: ["string", "null"] },
         },
