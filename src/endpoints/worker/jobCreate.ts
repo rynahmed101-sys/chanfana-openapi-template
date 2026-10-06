@@ -93,7 +93,7 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
       success: true,
       jobId: id,
       state: "queued",
-      requestId: body.packet.request_id,
+      requestId,
       estimatedDurationMs,
     };
   }

@@ -11,6 +11,12 @@ describe("research job envelope", () => {
       query: "improper integral convergence",
       providers: ["crossref", "openalex", "arxiv"],
       limits: { max_results_per_provider: 5, deadline_ms: 120000, max_response_bytes: 1500000 },
+      research_intent: {
+        objective: "collect bounded background evidence",
+        summary: "test",
+        requirements: ["return provenance"],
+        instructions: ["do not certify"],
+      },
       provenance: { capability_id: "stage1b.improper_integrals", experiment_id: null, correlation_id: "corr_123" },
     });
     expect(x.execution_kind).toBe("external_research");
