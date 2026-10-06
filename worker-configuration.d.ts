@@ -10,6 +10,8 @@ declare namespace Cloudflare {
 	}
 }
 interface Env extends Cloudflare.Env {
+	DB: D1Database;
+	AI: Ai;
 	WORKER_API_SECRET: string;
 	WORKER_MODEL?: string;
 }
