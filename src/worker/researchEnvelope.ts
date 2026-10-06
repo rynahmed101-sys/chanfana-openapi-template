@@ -33,6 +33,12 @@ export const ResearchJobEnvelope = z.object({
     deadline_ms: z.number().int().min(1_000).max(900_000),
     max_response_bytes: z.number().int().min(65_536).max(1_500_000),
   }),
+  research_intent: z.object({
+    objective: z.string().min(1).max(500),
+    summary: z.string().max(1000),
+    requirements: z.array(z.string().min(1).max(500)).max(30),
+    instructions: z.array(z.string().min(1).max(500)).min(1).max(10),
+  }),
   provenance: z.object({
     capability_id: z.string().min(1).max(128),
     experiment_id: z.string().min(1).max(128).nullable(),
