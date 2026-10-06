@@ -65,7 +65,7 @@ export class WorkerJobResult extends OpenAPIRoute<HandleArgs> {
       : "succeeded";
 
     await c.env.DB.prepare(
-      "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4"
+      "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4 AND state = 'running'"
     ).bind(nextState, JSON.stringify(body), now, params.id).run();
 
     return {
