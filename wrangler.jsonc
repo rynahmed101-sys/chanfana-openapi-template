@@ -3,8 +3,12 @@
   "main": "src/index.ts",
   "name": "chanfana-openapi-template",
   "upload_source_maps": true,
-  "observability": { "enabled": true },
-  "ai": { "binding": "AI" },
+  "observability": {
+    "enabled": true
+  },
+  "ai": {
+    "binding": "AI"
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -14,7 +18,10 @@
   ],
   "queues": {
     "producers": [
-      { "binding": "AUTOMATE_JOB_QUEUE", "queue": "automate-worker-jobs" }
+      {
+        "binding": "AUTOMATE_JOB_QUEUE",
+        "queue": "automate-worker-jobs"
+      }
     ],
     "consumers": [
       {
@@ -26,6 +33,11 @@
         "max_concurrency": 4,
         "retry_delay": 30
       }
+    ]
+  },
+  "triggers": {
+    "crons": [
+      "* * * * *"
     ]
   }
 }
