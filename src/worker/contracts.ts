@@ -39,7 +39,7 @@ export const WorkerPacket = z.object({
     request_id: z.string().min(8).max(128),
     repository: z.object({
       full_name: z.string().min(1),
-      base_branch: z.literal("main"),
+      base_branch: z.enum(["main", "engine"]),
       base_sha_claim: z.string().regex(/^[0-9a-f]{40}$/).nullable().optional(),
     }),
     capability: z.object({
