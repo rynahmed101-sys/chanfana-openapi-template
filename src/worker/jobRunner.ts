@@ -3,6 +3,7 @@ import { runWorkerModel } from "./model";
 import { validateWorkerResultAgainstPacket } from "./guard";
 import { stateForWorkerResult } from "./state";
 import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./researchEnvelope";
+import { validateVerificationJobEnvelope, type VerificationJobEnvelopeType } from "./verificationEnvelope";
 
 export async function runClaimedWorkerJob(
   env: Env,
@@ -18,6 +19,42 @@ export async function runClaimedWorkerJob(
   try {
     const stored = JSON.parse(row.packet_json);
     const packet = stored.packet;
+
+    // Verification jobs are durable handoffs to Automate's verifier. Chanfana
+    // authenticates, bounds, persists and retries; it never interprets the evidence.
+    if (packet?.schema_version === "automate.verification_job.v1") {
+      const verification: VerificationJobEnvelopeType = validateVerificationJobEnvelope(packet);
+      if (!env.VERIFICATION_ENGINE_JOB_TOKEN) {
+        throw new Error("Verification engine endpoint is not configured");
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), verification.limits.deadline_ms);
+      try {
+        const response = await fetch(verification.verifier_endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": "Bearer " + env.VERIFICATION_ENGINE_JOB_TOKEN,
+          },
+          body: JSON.stringify(verification),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("verification engine returned HTTP " + response.status);
+        const text = await response.text();
+        if (new TextEncoder().encode(text).byteLength > verification.limits.max_response_bytes) {
+          throw new Error("verification engine result exceeds bounded payload size");
+        }
+        const payload = JSON.parse(text);
+        const now = new Date().toISOString();
+        const updated = await env.DB.prepare(
+          "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
+        ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
+        if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("verification result lost its execution lease before persistence");
+        return;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
 
     // Research jobs are execution envelopes, not implementation-worker packets.
     // Chanfana provides bounded delivery; Mirror performs the world-facing research.

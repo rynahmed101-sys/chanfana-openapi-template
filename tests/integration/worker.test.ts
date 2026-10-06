@@ -139,6 +139,57 @@ describe("Automate worker API", () => {
     expect(resultBody.errors.some((error) => error.includes("outside allowed capability paths"))).toBe(true);
   });
 
+  it("reads a completed result payload when requested", async () => {
+    const body = packet("wrk_test_resultread1");
+    const create = await SELF.fetch("http://local.test/worker/v1/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + secret },
+      body: JSON.stringify(body),
+    });
+    const job = await create.json<{ jobId: string }>();
+    await env.DB.prepare(
+      "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, attempt = 2 WHERE id = ?2",
+    ).bind(JSON.stringify({ schema_version: "automate.verification_result.v1", status: "UNRESOLVED" }), job.jobId).run();
+    const read = await SELF.fetch("http://local.test/worker/v1/jobs/" + job.jobId + "?includeResult=true", {
+      headers: { Authorization: "Bearer " + secret },
+    });
+    expect(read.status).toBe(200);
+    const payload = await read.json<any>();
+    expect(payload.job.result.status).toBe("UNRESOLVED");
+    expect(payload.job.resultId).toContain("_attempt_2");
+  });
+
+  it("deduplicates verification envelopes by deterministic request id", async () => {
+    const verification = {
+      schema_version: "automate.verification_job.v1",
+      request_id: "ver_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      action_cycle_id: "cycle_12345678",
+      workflow_kind: "mathematical_check",
+      capability_id: "stage1b.improper_integrals",
+      source_revision: "a".repeat(40),
+      source_repository: "rynahmed101-sys/automate",
+      verifier_endpoint: "https://automate.example/verification",
+      limits: { deadline_ms: 30_000, max_response_bytes: 100_000 },
+      payload: { case: "1/(1+x**2)" },
+      provenance: { parent_ids: [], requested_by: "automate" },
+    };
+    const first = await SELF.fetch("http://local.test/worker/v1/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + secret },
+      body: JSON.stringify(verification),
+    });
+    const a = await first.json<any>();
+    const second = await SELF.fetch("http://local.test/worker/v1/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + secret },
+      body: JSON.stringify(verification),
+    });
+    const b = await second.json<any>();
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(b.jobId).toBe(a.jobId);
+  });
+
   it("rejects a result submitted before the job is claimed", async () => {
     const create = await SELF.fetch("http://local.test/worker/v1/jobs", {
       method: "POST",
@@ -167,3 +218,4 @@ describe("Automate worker API", () => {
     expect(result.status).toBe(409);
   });
 });
+

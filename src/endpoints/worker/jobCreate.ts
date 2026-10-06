@@ -2,13 +2,14 @@ import { contentJson, OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { HandleArgs } from "../../types";
 import { WorkerPacket } from "../../worker/contracts";
+import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
 import { durationEstimate } from "../../worker/timing";
 
 export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
     summary: "Queue a bounded Automate worker packet",
-    request: { body: contentJson(WorkerPacket) },
+    request: { body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope])) },
     responses: {
       "200": {
         description: "Queued or already queued",
@@ -20,7 +21,7 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
           estimatedDurationMs: z.number().int().nullable().optional(),
         })),
       },
-      "400": { description: "Invalid worker packet" },
+      "400": { description: "Invalid worker or verification packet" },
       "401": { description: "Unauthorized" },
       "503": { description: "Worker queue unavailable" },
     },
@@ -32,7 +33,7 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
 
     const existing = await c.env.DB.prepare(
       "SELECT id, state, request_id, dispatch_state FROM worker_jobs WHERE request_id = ?1",
-    ).bind(body.packet.request_id).first<{
+    ).bind(requestId).first<{
       id: string; state: string; request_id: string; dispatch_state: string;
     }>();
 
@@ -57,7 +58,7 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
 
     const samples = await c.env.DB.prepare(
       "SELECT started_at, finished_at FROM worker_jobs WHERE capability_id = ?1 AND state = 'succeeded' AND started_at IS NOT NULL AND finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 9",
-    ).bind(body.packet.capability.id).all<{ started_at: string; finished_at: string }>();
+    ).bind(capabilityId).all<{ started_at: string; finished_at: string }>();
 
     const durations = (samples.results ?? [])
       .map((sample) => Date.parse(sample.finished_at) - Date.parse(sample.started_at))
@@ -69,8 +70,8 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
       "INSERT INTO worker_jobs (id, request_id, capability_id, state, packet_json, result_json, created_at, updated_at, estimated_duration_ms, attempt, dispatch_state) VALUES (?1, ?2, ?3, 'queued', ?4, NULL, ?5, ?5, ?6, 0, 'pending')",
     ).bind(
       id,
-      body.packet.request_id,
-      body.packet.capability.id,
+      requestId,
+      capabilityId,
       JSON.stringify(body),
       now,
       estimatedDurationMs,
