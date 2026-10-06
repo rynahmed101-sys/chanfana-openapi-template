@@ -3,7 +3,7 @@ import { durationEstimate, timingSnapshot } from "../src/worker/timing";
 
 describe("worker job wall clock", () => {
   it("uses a bounded median estimate", () => {
-    expect(durationEstimate([1000, 5000, 3000])).toBe(3000);
+    expect(durationEstimate([30000, 50000, 70000])).toBe(50000);
     expect(durationEstimate([])).toBe(300000);
   });
 
@@ -22,7 +22,7 @@ describe("worker job wall clock", () => {
       attempt: 1,
     }, new Date("2026-10-06T12:03:00.000Z"));
 
-    expect(snapshot.elapsedMs).toBe(120000);
+    expect(snapshot.elapsedMs).toBe(180000);
     expect(snapshot.remainingMs).toBe(120000);
     expect(snapshot.etaAt).toBe(deadline);
     expect(snapshot.overdue).toBe(false);
