@@ -4,30 +4,18 @@ import { tasksRouter } from "./endpoints/tasks/router";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 import { DummyEndpoint } from "./endpoints/dummyEndpoint";
 import { workerRouter } from "./endpoints/worker/router";
+import { consumeWorkerJob, QUEUE_RETRY_DELAY_SECONDS, type WorkerJobMessage } from "./worker/queue";
 
-// Start a Hono app
 const app = new Hono<{ Bindings: Env }>();
 
 app.onError((err, c) => {
   if (err instanceof ApiException) {
-    return c.json(
-      { success: false, errors: err.buildResponse() },
-      err.status as ContentfulStatusCode,
-    );
+    return c.json({ success: false, errors: err.buildResponse() }, err.status as ContentfulStatusCode);
   }
-
   console.error("Global error handler caught:", err);
-
-  return c.json(
-    {
-      success: false,
-      errors: [{ code: 7000, message: "Internal Server Error" }],
-    },
-    500,
-  );
+  return c.json({ success: false, errors: [{ code: 7000, message: "Internal Server Error" }] }, 500);
 });
 
-// Setup OpenAPI registry
 const openapi = fromHono(app, {
   docs_url: "/",
   schema: {
@@ -41,7 +29,18 @@ const openapi = fromHono(app, {
 
 openapi.route("/tasks", tasksRouter);
 openapi.route("/worker/v1", workerRouter);
-
 openapi.post("/dummy/:slug", DummyEndpoint);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async queue(batch: MessageBatch<WorkerJobMessage>, env: Env): Promise<void> {
+    for (const message of batch.messages) {
+      const outcome = await consumeWorkerJob(env, message.body.jobId);
+      if (outcome === "ack") {
+        message.ack();
+      } else {
+        message.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+      }
+    }
+  },
+} satisfies ExportedHandler<Env, WorkerJobMessage>;
