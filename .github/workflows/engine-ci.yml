@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+
+concurrency:
+  group: chanfana-openapi-template-engine-ci
+  cancel-in-progress: true
+
 jobs:
   worker:
     runs-on: ubuntu-latest
