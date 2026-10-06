@@ -35,6 +35,7 @@ function packet(requestId = "wrk_test_12345678") {
         must_run_tests: true,
         must_report_unresolved: true,
         must_not_claim_certification: true,
+        test_targets: ["tests/test_improper_integrals.py"],
       },
     },
   };
