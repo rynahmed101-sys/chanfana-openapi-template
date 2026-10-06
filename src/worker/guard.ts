@@ -24,6 +24,12 @@ export function validateWorkerResultAgainstPacket(
   }
 
   for (const change of result.changes) {
+    if (change.operation === "update" && !change.expected_sha) {
+      errors.push("update change is missing expected_sha: " + change.path);
+    }
+    if (change.operation === "create" && change.expected_sha !== null) {
+      errors.push("create change must use null expected_sha: " + change.path);
+    }
     if (!underPrefix(change.path, packet.constraints.allowed_path_prefixes)) {
       errors.push("change outside allowed capability paths: " + change.path);
     }
