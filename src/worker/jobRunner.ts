@@ -63,6 +63,12 @@ export async function runClaimedWorkerJob(
     // Chanfana provides bounded delivery; Mirror performs the world-facing research.
     if (packet?.schema_version === "mirror.research_job.v1") {
       const research: ResearchJobEnvelopeType = validateResearchJobEnvelope(packet);
+      if (!env.MIRROR_RESEARCH_ENDPOINT || !env.MIRROR_RESEARCH_JOB_TOKEN) {
+        throw new Error("Mirror research endpoint or authentication is not configured");
+      }
+      if (research.target.mirror_endpoint !== env.MIRROR_RESEARCH_ENDPOINT) {
+        throw new Error("Mirror research endpoint is not allowlisted");
+      }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), research.limits.deadline_ms);
       try {
@@ -70,7 +76,7 @@ export async function runClaimedWorkerJob(
           method: "POST",
           headers: {
             "content-type": "application/json",
-            ...(env.MIRROR_RESEARCH_JOB_TOKEN ? { authorization: "Bearer " + env.MIRROR_RESEARCH_JOB_TOKEN } : {}),
+            authorization: "Bearer " + env.MIRROR_RESEARCH_JOB_TOKEN,
           },
           body: JSON.stringify({
             query: research.query,
