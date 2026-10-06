@@ -32,9 +32,10 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
 
   public async handle(c: HandleArgs[0]) {
     const { params } = await this.getValidatedData<typeof this.schema>();
+    const startedAt = new Date();
     const claimed = await c.env.DB.prepare(
-      "UPDATE worker_jobs SET state = 'running', updated_at = ?1 WHERE id = ?2 AND state = 'queued'"
-    ).bind(new Date().toISOString(), params.id).run();
+      "UPDATE worker_jobs SET state = 'running', started_at = ?1, heartbeat_at = ?1, finished_at = NULL, deadline_at = datetime(?1, '+' || CAST(COALESCE(estimated_duration_ms, 300000) / 1000 AS INTEGER) || ' seconds'), attempt = attempt + 1, last_error = NULL, updated_at = ?1 WHERE id = ?2 AND state = 'queued'"
+    ).bind(startedAt.toISOString(), params.id).run();
 
     if (!claimed.success || (claimed.meta.changes ?? 0) !== 1) {
       const row = await c.env.DB.prepare("SELECT state FROM worker_jobs WHERE id = ?1")
@@ -61,7 +62,7 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
       if (errors.length || nextState === "failed") {
         const now = new Date().toISOString();
         const updated = await c.env.DB.prepare(
-          "UPDATE worker_jobs SET state = 'failed', result_json = ?1, updated_at = ?2 WHERE id = ?3 AND state = 'running'"
+          "UPDATE worker_jobs SET state = 'failed', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, updated_at = ?2 WHERE id = ?3 AND state = 'running'"
         ).bind(JSON.stringify(result), now, params.id).run();
         if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
           return c.json({ success: false, error: "Worker result lost a concurrent state transition" }, 409);
@@ -71,7 +72,7 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
 
       const now = new Date().toISOString();
       const updated = await c.env.DB.prepare(
-        "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4 AND state = 'running'"
+        "UPDATE worker_jobs SET state = ?1, result_json = ?2, finished_at = ?3, heartbeat_at = ?3, updated_at = ?3 WHERE id = ?4 AND state = 'running'"
       ).bind(nextState, JSON.stringify(result), now, params.id).run();
 
       if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
@@ -87,9 +88,13 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
     } catch (error) {
       const now = new Date().toISOString();
       await c.env.DB.prepare(
-        "UPDATE worker_jobs SET state = 'failed', updated_at = ?1 WHERE id = ?2"
+        "UPDATE worker_jobs SET state = 'failed', finished_at = ?1, heartbeat_at = ?1, last_error = ?2, updated_at = ?1 WHERE id = ?3"
       ).bind(now, params.id).run();
       const message = error instanceof Error ? error.message : String(error);
+      const failedAt = new Date().toISOString();
+      await c.env.DB.prepare(
+        "UPDATE worker_jobs SET state = 'failed', finished_at = ?1, heartbeat_at = ?1, last_error = ?2, updated_at = ?1 WHERE id = ?3"
+      ).bind(failedAt, message, params.id).run();
       return c.json({ success: false, error: message }, 503);
     }
   }
