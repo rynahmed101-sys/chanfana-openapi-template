@@ -24,7 +24,7 @@ export function validateWorkerResultAgainstPacket(
   }
 
   for (const change of result.changes) {
-    if (change.operation === "update" && !change.expected_sha) {
+    if (change.operation === "update" && typeof change.expected_sha !== "string") {
       errors.push("update change is missing expected_sha: " + change.path);
     }
     if (change.operation === "create" && change.expected_sha !== null) {
