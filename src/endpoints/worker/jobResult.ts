@@ -3,6 +3,7 @@ import { z } from "zod";
 import { HandleArgs } from "../../types";
 import { WorkerResult } from "../../worker/contracts";
 import { validateWorkerResultAgainstPacket } from "../../worker/guard";
+import { stateForWorkerResult } from "../../worker/state";
 
 export class WorkerJobResult extends OpenAPIRoute<HandleArgs> {
   public schema = {
@@ -60,9 +61,7 @@ export class WorkerJobResult extends OpenAPIRoute<HandleArgs> {
     }
 
     const now = new Date().toISOString();
-    const nextState = body.status === "failed" || body.status === "rejected"
-      ? "failed"
-      : "succeeded";
+    const nextState = stateForWorkerResult(body);
 
     const updated = await c.env.DB.prepare(
       "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4 AND state = 'running'"

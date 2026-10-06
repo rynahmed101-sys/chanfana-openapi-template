@@ -4,6 +4,7 @@ import { HandleArgs } from "../../types";
 import { WorkerResult } from "../../worker/contracts";
 import { runWorkerModel } from "../../worker/model";
 import { validateWorkerResultAgainstPacket } from "../../worker/guard";
+import { stateForWorkerResult } from "../../worker/state";
 
 export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
   public schema = {
@@ -55,21 +56,34 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
       const packet = stored.packet;
       const result = await runWorkerModel(c.env, packet);
       const errors = validateWorkerResultAgainstPacket(packet, result);
+      const nextState = stateForWorkerResult(result);
 
-      if (errors.length) {
+      if (errors.length || nextState === "failed") {
         const now = new Date().toISOString();
-        await c.env.DB.prepare(
-          "UPDATE worker_jobs SET state = 'failed', result_json = ?1, updated_at = ?2 WHERE id = ?3"
+        const updated = await c.env.DB.prepare(
+          "UPDATE worker_jobs SET state = 'failed', result_json = ?1, updated_at = ?2 WHERE id = ?3 AND state = 'running'"
         ).bind(JSON.stringify(result), now, params.id).run();
+        if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
+          return c.json({ success: false, error: "Worker result lost a concurrent state transition" }, 409);
+        }
         return { success: false, state: "failed", result, errors };
       }
 
       const now = new Date().toISOString();
-      await c.env.DB.prepare(
-        "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, updated_at = ?2 WHERE id = ?3"
-      ).bind(JSON.stringify(result), now, params.id).run();
+      const updated = await c.env.DB.prepare(
+        "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4 AND state = 'running'"
+      ).bind(nextState, JSON.stringify(result), now, params.id).run();
 
-      return { success: true, state: "succeeded", result, errors: [] };
+      if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
+        return c.json({ success: false, error: "Worker result lost a concurrent state transition" }, 409);
+      }
+
+      return {
+        success: nextState === "succeeded",
+        state: nextState,
+        result,
+        errors,
+      };
     } catch (error) {
       const now = new Date().toISOString();
       await c.env.DB.prepare(
