@@ -156,7 +156,7 @@ describe("Automate worker API", () => {
     expect(read.status).toBe(200);
     const payload = await read.json<any>();
     expect(payload.job.result.status).toBe("UNRESOLVED");
-    expect(payload.job.resultId).toContain("_attempt_2");
+    expect(payload.job.resultId).toMatch(/^res_[0-9a-f]{64}$/);
   });
 
   it("deduplicates verification envelopes by deterministic request id", async () => {
