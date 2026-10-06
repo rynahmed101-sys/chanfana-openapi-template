@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 }
 interface Env extends Cloudflare.Env {
 	WORKER_API_SECRET: string;
+	WORKER_MODEL?: string;
 }
 
 // Begin runtime types
