@@ -2,6 +2,7 @@ import { type WorkerResultType } from "./contracts";
 import { runWorkerModel } from "./model";
 import { validateWorkerResultAgainstPacket } from "./guard";
 import { stateForWorkerResult } from "./state";
+import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./researchEnvelope";
 
 export async function runClaimedWorkerJob(
   env: Env,
@@ -17,6 +18,41 @@ export async function runClaimedWorkerJob(
   try {
     const stored = JSON.parse(row.packet_json);
     const packet = stored.packet;
+
+    // Research jobs are execution envelopes, not implementation-worker packets.
+    // Chanfana provides bounded delivery; Mirror performs the world-facing research.
+    if (packet?.schema_version === "mirror.research_job.v1") {
+      const research: ResearchJobEnvelopeType = validateResearchJobEnvelope(packet);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), research.limits.deadline_ms);
+      try {
+        const response = await fetch(research.target.mirror_endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(env.MIRROR_RESEARCH_JOB_TOKEN ? { authorization: "Bearer " + env.MIRROR_RESEARCH_JOB_TOKEN } : {}),
+          },
+          body: JSON.stringify({
+            query: research.query,
+            providers: research.providers,
+            limit: research.limits.max_results_per_provider,
+            correlationId: research.provenance.correlation_id,
+          }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Mirror research endpoint returned HTTP " + response.status);
+        const payload = await response.json();
+        const now = new Date().toISOString();
+        const updated = await env.DB.prepare(
+          "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
+        ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
+        if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("research result lost its execution lease before persistence");
+        return;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
     const result: WorkerResultType = await runWorkerModel(env, packet);
     const errors = validateWorkerResultAgainstPacket(packet, result);
     const nextState = errors.length ? "failed" : stateForWorkerResult(result);
