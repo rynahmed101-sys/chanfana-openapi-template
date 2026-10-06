@@ -5,6 +5,7 @@ import { ContentfulStatusCode } from "hono/utils/http-status";
 import { DummyEndpoint } from "./endpoints/dummyEndpoint";
 import { workerRouter } from "./endpoints/worker/router";
 import { consumeWorkerJob, QUEUE_RETRY_DELAY_SECONDS, type WorkerJobMessage } from "./worker/queue";
+import { recoverStaleWorkerJobs } from "./worker/recovery";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -42,5 +43,8 @@ export default {
         message.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
       }
     }
+  },
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await recoverStaleWorkerJobs(env);
   },
 } satisfies ExportedHandler<Env, WorkerJobMessage>;
