@@ -60,6 +60,7 @@ export const WorkerPacket = z.object({
       must_run_tests: z.literal(true),
       must_report_unresolved: z.literal(true),
       must_not_claim_certification: z.literal(true),
+      test_targets: z.array(z.string().regex(/^tests\//)).min(1).max(20),
     }),
   }),
 });
