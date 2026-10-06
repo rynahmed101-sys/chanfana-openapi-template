@@ -12,6 +12,7 @@ import { LearningRead } from "./learningRead";
 export const workerRouter = fromHono(new Hono<{ Bindings: Env }>());
 
 workerRouter.get("/health", WorkerHealth);
+workerRouter.use("/learning", requireWorkerAuth);
 workerRouter.use("/learning/*", requireWorkerAuth);
 workerRouter.get("/learning", LearningRead);
 workerRouter.use("/jobs/*", requireWorkerAuth);
