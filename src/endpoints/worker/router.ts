@@ -8,6 +8,7 @@ import { WorkerJobResult } from "./jobResult";
 import { requireWorkerAuth } from "../../worker/auth";
 import { WorkerJobExecute } from "./jobExecute";
 import { LearningRead } from "./learningRead";
+import { LearningCreate } from "./learningCreate";
 
 export const workerRouter = fromHono(new Hono<{ Bindings: Env }>());
 
@@ -15,6 +16,7 @@ workerRouter.get("/health", WorkerHealth);
 workerRouter.use("/learning", requireWorkerAuth);
 workerRouter.use("/learning/*", requireWorkerAuth);
 workerRouter.get("/learning", LearningRead);
+workerRouter.post("/learning", LearningCreate);
 workerRouter.use("/jobs/*", requireWorkerAuth);
 workerRouter.post("/jobs", WorkerJobCreate);
 workerRouter.get("/jobs/:id", WorkerJobRead);
