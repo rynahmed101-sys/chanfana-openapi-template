@@ -6,7 +6,6 @@ import { DummyEndpoint } from "./endpoints/dummyEndpoint";
 import { workerRouter } from "./endpoints/worker/router";
 import { recoverStaleWorkerJobs } from "./worker/recovery";
 import { consumeWorkerJob, QUEUE_RETRY_DELAY_SECONDS, type WorkerJobMessage } from "./worker/queue";
-import { recoverStaleWorkerJobs } from "./worker/recovery";
 
 const app = new Hono<{ Bindings: Env }>();
 
