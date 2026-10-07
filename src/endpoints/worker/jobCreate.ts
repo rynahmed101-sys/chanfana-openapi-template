@@ -4,13 +4,14 @@ import { HandleArgs } from "../../types";
 import { WorkerPacket } from "../../worker/contracts";
 import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
 import { LearningHandoffEnvelope } from "../../worker/learningEnvelope";
+import { ResearchJobEnvelope } from "../../worker/researchEnvelope";
 import { durationEstimate } from "../../worker/timing";
 
 export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
     summary: "Queue a bounded Automate worker packet",
-    request: { body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope, LearningHandoffEnvelope])) },
+    request: { body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope, LearningHandoffEnvelope, ResearchJobEnvelope])) },
     responses: {
       "200": {
         description: "Queued or already queued",
