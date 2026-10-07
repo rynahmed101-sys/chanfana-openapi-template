@@ -5,6 +5,7 @@ import { stateForWorkerResult } from "./state";
 import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./researchEnvelope";
 import { validateVerificationJobEnvelope, type VerificationJobEnvelopeType } from "./verificationEnvelope";
 import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } from "./learningEnvelope";
+import { validateDiscoveryJobEnvelope, type DiscoveryJobEnvelopeType } from "./discoveryEnvelope";
 import { storeLearningArtifact } from "./learningLedger";
 
 export async function runClaimedWorkerJob(
@@ -122,6 +123,50 @@ export async function runClaimedWorkerJob(
           "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
         ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
         if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("research result lost its execution lease before persistence");
+        return;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // Autonomous discovery jobs are durable commissions to Mirror. Chanfana
+    // persists the untrusted result; Automate performs candidate triage/admission.
+    if (packet?.schema_version === "mirror.discovery_job.v1") {
+      const discovery: DiscoveryJobEnvelopeType = validateDiscoveryJobEnvelope(packet);
+      if (!env.MIRROR_DISCOVERY_ENDPOINT || !env.MIRROR_DISCOVERY_JOB_TOKEN) {
+        throw new Error("Mirror discovery endpoint or authentication is not configured");
+      }
+      if (discovery.target.mirror_endpoint !== env.MIRROR_DISCOVERY_ENDPOINT) {
+        throw new Error("Mirror discovery endpoint is not allowlisted");
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), discovery.limits.deadline_ms);
+      try {
+        const response = await fetch(discovery.target.mirror_endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: "Bearer " + env.MIRROR_DISCOVERY_JOB_TOKEN,
+          },
+          body: JSON.stringify({
+            correlationId: discovery.discovery_grant.correlation_id,
+            discoveryGrant: discovery.discovery_grant,
+            objective: discovery.objective,
+            maxToolSteps: discovery.limits.max_tool_steps,
+          }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Mirror discovery endpoint returned HTTP " + response.status);
+        const text = await response.text();
+        if (new TextEncoder().encode(text).byteLength > discovery.limits.max_response_bytes) {
+          throw new Error("Mirror discovery result exceeds bounded payload size");
+        }
+        const payload = JSON.parse(text);
+        const now = new Date().toISOString();
+        const updated = await env.DB.prepare(
+          "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
+        ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
+        if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("discovery result lost its execution lease before persistence");
         return;
       } finally {
         clearTimeout(timer);
