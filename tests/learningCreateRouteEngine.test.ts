@@ -14,7 +14,7 @@ import path from "node:path";
 describe("engine learning persistence migration", () => {
   it("contains the durable learning_artifacts table", () => {
     const source = fs.readFileSync(
-      path.resolve("migrations/0003_learning_artifacts.sql"),
+      path.resolve("migrations/0005_learning_artifacts.sql"),
       "utf8",
     );
     expect(source).toContain("CREATE TABLE IF NOT EXISTS learning_artifacts");
