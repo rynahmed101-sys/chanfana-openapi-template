@@ -15,6 +15,8 @@ export const ResearchProvider = z.enum([
   "crossref",
   "openalex",
   "arxiv",
+  "inspirehep",
+  "semanticscholar",
   "github",
   "huggingface",
 ]);
