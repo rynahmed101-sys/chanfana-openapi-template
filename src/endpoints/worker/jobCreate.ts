@@ -5,13 +5,14 @@ import { WorkerPacket } from "../../worker/contracts";
 import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
 import { LearningHandoffEnvelope } from "../../worker/learningEnvelope";
 import { ResearchJobEnvelope } from "../../worker/researchEnvelope";
+import { DiscoveryJobEnvelope } from "../../worker/discoveryEnvelope";
 import { durationEstimate } from "../../worker/timing";
 
 export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
     summary: "Queue a bounded Automate worker packet",
-    request: { body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope, LearningHandoffEnvelope, ResearchJobEnvelope])) },
+    request: { body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope, LearningHandoffEnvelope, ResearchJobEnvelope, DiscoveryJobEnvelope])) },
     responses: {
       "200": {
         description: "Queued or already queued",
@@ -40,6 +41,8 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
       ? envelope.packet.capability.id
       : ("capability_id" in envelope
         ? envelope.capability_id
+        : "execution_kind" in envelope && envelope.execution_kind === "autonomous_discovery"
+        ? "mirror:discovery"
         : "learning:" + envelope.artifact_type);
 
     const existing = await c.env.DB.prepare(
