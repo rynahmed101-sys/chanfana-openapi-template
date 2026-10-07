@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS learning_artifacts (
+CREATE TABLE learning_artifacts (
   id TEXT PRIMARY KEY,
   artifact_type TEXT NOT NULL,
   authority TEXT NOT NULL,
