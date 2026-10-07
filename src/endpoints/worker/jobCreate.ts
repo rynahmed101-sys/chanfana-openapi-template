@@ -4,13 +4,21 @@ import { HandleArgs } from "../../types";
 import { WorkerPacket } from "../../worker/contracts";
 import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
 import { DiscoveryJobEnvelope } from "../../worker/discoveryEnvelope";
+import { LearningHandoffEnvelope } from "../../worker/learningEnvelope";
+import { ResearchJobEnvelope } from "../../worker/researchEnvelope";
 
 export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
     summary: "Queue a bounded Automate worker packet",
     request: {
-      body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope, DiscoveryJobEnvelope])),
+      body: contentJson(z.union([
+        WorkerPacket,
+        VerificationJobEnvelope,
+        LearningHandoffEnvelope,
+        ResearchJobEnvelope,
+        DiscoveryJobEnvelope,
+      ])),
     },
     responses: {
       "200": {
@@ -42,6 +50,8 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
       ? body.packet.capability.id
       : "execution_kind" in body && body.execution_kind === "autonomous_discovery"
       ? "mirror:discovery"
+      : "artifact_type" in body
+      ? "learning:" + body.artifact_type
       : body.capability_id;
 
     const existing = await c.env.DB
