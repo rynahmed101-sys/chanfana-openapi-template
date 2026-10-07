@@ -12,3 +12,4 @@ CREATE TABLE learning_artifacts (
 );
 CREATE INDEX learning_artifacts_type_idx ON learning_artifacts(artifact_type, created_at DESC);
 CREATE INDEX learning_artifacts_source_idx ON learning_artifacts(source_repo, created_at DESC);
+-- Durable learning artifacts are untrusted evidence and never certification authority.
