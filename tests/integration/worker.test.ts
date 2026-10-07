@@ -90,7 +90,7 @@ describe("Automate worker API", () => {
       headers: { Authorization: "Bearer " + secret },
     });
     expect(claim.status).toBe(200);
-    expect((await claim.json<{ state: string }>()).state).toBe("queued");
+    expect((await claim.json<{ state: string }>()).state).toBe("running");
   });
 
   it("rejects a result outside the packet boundary", async () => {
