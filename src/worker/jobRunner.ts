@@ -52,13 +52,13 @@ export async function runClaimedWorkerJob(
         }
         const payload = JSON.parse(text);
         if (!payload || typeof payload !== "object") {
-          throw new Error("Mirror discovery result must be a JSON object");
+          throw new Error("Verification engine result must be a JSON object");
         }
-        if (payload.correlationId !== discovery.discovery_grant.correlation_id) {
-          throw new Error("Mirror discovery result correlationId does not match the granted request");
+        if (payload.request_id !== verification.request_id) {
+          throw new Error("Verification result request_id does not match the requested verification job");
         }
-        if (payload.grantId !== discovery.discovery_grant.grant_id) {
-          throw new Error("Mirror discovery result grantId does not match the granted request");
+        if (payload.source_revision !== verification.source_revision) {
+          throw new Error("Verification result source_revision does not match the requested revision");
         }
         const now = new Date().toISOString();
         const updated = await env.DB.prepare(
