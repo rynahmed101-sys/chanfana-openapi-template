@@ -168,6 +168,7 @@ describe("Automate worker API", () => {
       capability_id: "stage1b.improper_integrals",
       source_revision: "a".repeat(40),
       source_repository: "rynahmed101-sys/automate",
+      source_branch: "feat/stage1b.improper_integrals-" + "b".repeat(12),
       verifier_endpoint: "https://automate.example/verification",
       limits: { deadline_ms: 30_000, max_response_bytes: 100_000 },
       payload: { case: "1/(1+x**2)" },
