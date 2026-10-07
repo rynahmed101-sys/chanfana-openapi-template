@@ -24,6 +24,7 @@ export const VerificationJobEnvelope = z.object({
   capability_id: z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/),
   source_revision: z.string().regex(/^[0-9a-f]{40}$/),
   source_repository: z.string().min(1).max(200),
+  source_branch: z.string().min(1).max(255).refine((value) => !value.startsWith("/") && !value.split("/").includes(".."), "source branch contains unsafe path segments"),
   verifier_endpoint: z.string().url(),
   limits: z.object({
     deadline_ms: z.number().int().min(1_000).max(900_000),
