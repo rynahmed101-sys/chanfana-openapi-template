@@ -3,13 +3,14 @@ import { z } from "zod";
 import { HandleArgs } from "../../types";
 import { WorkerPacket } from "../../worker/contracts";
 import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
+import { DiscoveryJobEnvelope } from "../../worker/discoveryEnvelope";
 
 export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
     summary: "Queue a bounded Automate worker packet",
     request: {
-      body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope])),
+      body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope, DiscoveryJobEnvelope])),
     },
     responses: {
       "200": {
@@ -37,7 +38,11 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
     const { body } = await this.getValidatedData<typeof this.schema>();
     const now = new Date().toISOString();
     const requestId = "packet" in body ? body.packet.request_id : body.request_id;
-    const capabilityId = "packet" in body ? body.packet.capability.id : body.capability_id;
+    const capabilityId = "packet" in body
+      ? body.packet.capability.id
+      : "execution_kind" in body && body.execution_kind === "autonomous_discovery"
+      ? "mirror:discovery"
+      : body.capability_id;
 
     const existing = await c.env.DB
       .prepare("SELECT id, state, request_id FROM worker_jobs WHERE request_id = ?1")
