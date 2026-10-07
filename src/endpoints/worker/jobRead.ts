@@ -11,6 +11,8 @@ const Job = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   hasResult: z.boolean(),
+  resultId: z.string().nullable(),
+  result: z.unknown().nullable(),
 });
 
 export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
@@ -45,6 +47,27 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
       return c.json({ success: false, error: "Job not found" }, 404);
     }
 
+    let result: unknown = null;
+    let resultId: string | null = null;
+    if (row.result_json !== null) {
+      const bytes = new TextEncoder().encode(row.result_json).byteLength;
+      if (bytes > 1_500_000) {
+        return c.json({ success: false, error: "Persisted result exceeds bounded read size" }, 413);
+      }
+      try {
+        result = JSON.parse(row.result_json);
+      } catch {
+        return c.json({ success: false, error: "Persisted result is malformed JSON" }, 500);
+      }
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(row.result_json),
+      );
+      resultId = "res_" + Array.from(new Uint8Array(digest))
+        .map((value) => value.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
     return {
       success: true as const,
       job: {
@@ -55,6 +78,8 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         hasResult: row.result_json !== null,
+        resultId,
+        result,
       },
     };
   }
