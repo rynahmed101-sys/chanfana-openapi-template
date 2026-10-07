@@ -5,6 +5,7 @@ import { WorkerPacket } from "../../worker/contracts";
 import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
 import { LearningHandoffEnvelope } from "../../worker/learningEnvelope";
 import { ResearchJobEnvelope } from "../../worker/researchEnvelope";
+import { FrontierJobEnvelope } from "../../worker/frontierEnvelope";
 import { DiscoveryJobEnvelope } from "../../worker/discoveryEnvelope";
 import { durationEstimate } from "../../worker/timing";
 
