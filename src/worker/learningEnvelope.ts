@@ -31,3 +31,8 @@ export const LearningHandoffEnvelope = z.object({
 });
 
 export type LearningHandoffEnvelopeType = z.infer<typeof LearningHandoffEnvelope>;
+
+
+export function validateLearningHandoffEnvelope(input: unknown): LearningHandoffEnvelopeType {
+  return LearningHandoffEnvelope.parse(input);
+}
