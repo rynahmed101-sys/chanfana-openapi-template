@@ -20,7 +20,8 @@ export async function runClaimedWorkerJob(
 
   try {
     const stored = JSON.parse(row.packet_json);
-    const packet = stored.packet;
+    // Worker packets use a packet wrapper; learning handoffs are top-level envelopes.
+    const packet = stored.packet ?? stored;
 
     // Verification jobs are durable handoffs to Automate's verifier. Chanfana
     // authenticates, bounds, persists and retries; it never interprets the evidence.
