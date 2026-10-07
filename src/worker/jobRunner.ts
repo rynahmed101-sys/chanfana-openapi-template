@@ -51,6 +51,15 @@ export async function runClaimedWorkerJob(
           throw new Error("verification engine result exceeds bounded payload size");
         }
         const payload = JSON.parse(text);
+        if (!payload || typeof payload !== "object") {
+          throw new Error("Mirror discovery result must be a JSON object");
+        }
+        if (payload.correlationId !== discovery.discovery_grant.correlation_id) {
+          throw new Error("Mirror discovery result correlationId does not match the granted request");
+        }
+        if (payload.grantId !== discovery.discovery_grant.grant_id) {
+          throw new Error("Mirror discovery result grantId does not match the granted request");
+        }
         const now = new Date().toISOString();
         const updated = await env.DB.prepare(
           "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
