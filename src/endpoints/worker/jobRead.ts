@@ -21,6 +21,7 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
     summary: "Inspect an autonomous worker job",
     request: {
       params: z.object({ id: z.string().min(1) }),
+      query: z.object({ includeResult: z.coerce.boolean().default(true) }),
     },
     responses: {
       "200": { description: "Job found", ...contentJson(z.object({ success: z.literal(true), job: Job })) },
@@ -30,7 +31,7 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
   };
 
   public async handle(c: HandleArgs[0]) {
-    const { params } = await this.getValidatedData<typeof this.schema>();
+    const { params, query } = await this.getValidatedData<typeof this.schema>();
     const row = await c.env.DB.prepare(
       "SELECT id, request_id, capability_id, state, created_at, updated_at, result_json FROM worker_jobs WHERE id = ?1"
     ).bind(params.id).first<{
@@ -49,7 +50,7 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
 
     let result: unknown = null;
     let resultId: string | null = null;
-    if (row.result_json !== null) {
+    if (query.includeResult && row.result_json !== null) {
       const bytes = new TextEncoder().encode(row.result_json).byteLength;
       if (bytes > 1_500_000) {
         return c.json({ success: false, error: "Persisted result exceeds bounded read size" }, 413);

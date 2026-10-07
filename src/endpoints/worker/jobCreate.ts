@@ -2,13 +2,14 @@ import { contentJson, OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { HandleArgs } from "../../types";
 import { WorkerPacket } from "../../worker/contracts";
+import { VerificationJobEnvelope } from "../../worker/verificationEnvelope";
 
 export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
     summary: "Queue a bounded Automate worker packet",
     request: {
-      body: contentJson(WorkerPacket),
+      body: contentJson(z.union([WorkerPacket, VerificationJobEnvelope])),
     },
     responses: {
       "200": {
@@ -35,10 +36,12 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
   public async handle(c: HandleArgs[0]) {
     const { body } = await this.getValidatedData<typeof this.schema>();
     const now = new Date().toISOString();
+    const requestId = "packet" in body ? body.packet.request_id : body.request_id;
+    const capabilityId = "packet" in body ? body.packet.capability.id : body.capability_id;
 
     const existing = await c.env.DB
       .prepare("SELECT id, state, request_id FROM worker_jobs WHERE request_id = ?1")
-      .bind(body.packet.request_id)
+      .bind(requestId)
       .first<{ id: string; state: string; request_id: string }>();
 
     if (existing) {
@@ -55,8 +58,8 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
       "INSERT INTO worker_jobs (id, request_id, capability_id, state, packet_json, result_json, created_at, updated_at) VALUES (?1, ?2, ?3, 'queued', ?4, NULL, ?5, ?5)"
     ).bind(
       id,
-      body.packet.request_id,
-      body.packet.capability.id,
+      requestId,
+      capabilityId,
       JSON.stringify(body),
       now,
     ).run();
@@ -65,7 +68,7 @@ export class WorkerJobCreate extends OpenAPIRoute<HandleArgs> {
       success: true,
       jobId: id,
       state: "queued",
-      requestId: body.packet.request_id,
+      requestId,
     };
   }
 }
