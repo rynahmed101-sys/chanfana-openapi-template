@@ -8,6 +8,22 @@ import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } fro
 import { validateDiscoveryJobEnvelope, type DiscoveryJobEnvelopeType } from "./discoveryEnvelope";
 import { storeLearningArtifact } from "./learningLedger";
 
+export function validateVerificationResultIdentity(
+  payload: unknown,
+  verification: VerificationJobEnvelopeType,
+): void {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Verification engine result must be a JSON object");
+  }
+  const value = payload as Record<string, unknown>;
+  if (value.request_id !== verification.request_id) {
+    throw new Error("Verification result request_id does not match the requested verification job");
+  }
+  if (value.source_revision !== verification.source_revision) {
+    throw new Error("Verification result source_revision does not match the requested revision");
+  }
+}
+
 export async function runClaimedWorkerJob(
   env: Env,
   jobId: string,
@@ -51,15 +67,7 @@ export async function runClaimedWorkerJob(
           throw new Error("verification engine result exceeds bounded payload size");
         }
         const payload = JSON.parse(text);
-        if (!payload || typeof payload !== "object") {
-          throw new Error("Mirror discovery result must be a JSON object");
-        }
-        if (payload.correlationId !== discovery.discovery_grant.correlation_id) {
-          throw new Error("Mirror discovery result correlationId does not match the granted request");
-        }
-        if (payload.grantId !== discovery.discovery_grant.grant_id) {
-          throw new Error("Mirror discovery result grantId does not match the granted request");
-        }
+        validateVerificationResultIdentity(payload, verification);
         const now = new Date().toISOString();
         const updated = await env.DB.prepare(
           "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
