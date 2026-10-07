@@ -60,7 +60,7 @@ describe("Automate worker API", () => {
   });
 
   it("queues idempotently and supports claim", async () => {
-    const body = packet();
+    const body = packet("wrk_test_claim_20261007_001");
     const first = await SELF.fetch("http://local.test/worker/v1/jobs", {
       method: "POST",
       headers: {
