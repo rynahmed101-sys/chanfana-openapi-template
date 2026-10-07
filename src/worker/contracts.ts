@@ -32,6 +32,17 @@ export const WorkerResult = z.object({
   claims: z.array(WorkerClaim).optional(),
 });
 
+const WorkerContextFile = z.object({
+  path: z.string().min(1).max(500),
+  sha: z.string().regex(/^[0-9a-f]{40}$/),
+  content: z.string().max(100_000),
+});
+
+const WorkerContext = z.object({
+  files: z.array(WorkerContextFile).max(25),
+  notes: z.array(z.string().max(4_000)).max(20),
+});
+
 export const WorkerPacket = z.object({
   schema_version: z.literal("automate.worker.v1"),
   packet: z.object({
@@ -56,6 +67,7 @@ export const WorkerPacket = z.object({
       allow_delete: z.literal(false),
     }),
     instructions: z.array(z.string().min(1)).min(1),
+    context: WorkerContext.optional(),
     verification: z.object({
       must_run_tests: z.literal(true),
       must_report_unresolved: z.literal(true),
