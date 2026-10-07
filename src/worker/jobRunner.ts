@@ -6,6 +6,7 @@ import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./res
 import { validateVerificationJobEnvelope, type VerificationJobEnvelopeType } from "./verificationEnvelope";
 import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } from "./learningEnvelope";
 import { validateDiscoveryJobEnvelope, type DiscoveryJobEnvelopeType } from "./discoveryEnvelope";
+import { validateFrontierJobEnvelope, type FrontierJobEnvelopeType } from "./frontierEnvelope";
 import { storeLearningArtifact } from "./learningLedger";
 
 export function validateVerificationResultIdentity(
@@ -102,6 +103,45 @@ export async function runClaimedWorkerJob(
       ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
       if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("learning handoff lost its execution lease before persistence");
       return;
+    }
+
+    // Full frontier missions are durable commissions to Mirror. Chanfana only
+    // authenticates, bounds, leases, retries and persists the result.
+    if (packet?.schema_version === "mirror.frontier_job.v1") {
+      const frontier: FrontierJobEnvelopeType = validateFrontierJobEnvelope(packet);
+      if (!env.MIRROR_FRONTIER_ENDPOINT || !env.MIRROR_FRONTIER_JOB_TOKEN) {
+        throw new Error("Mirror frontier endpoint or authentication is not configured");
+      }
+      if (frontier.target.mirror_endpoint !== env.MIRROR_FRONTIER_ENDPOINT) {
+        throw new Error("Mirror frontier endpoint is not allowlisted");
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), frontier.limits.deadline_ms);
+      try {
+        const response = await fetch(frontier.target.mirror_endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: "Bearer " + env.MIRROR_FRONTIER_JOB_TOKEN,
+          },
+          body: JSON.stringify(frontier),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Mirror frontier endpoint returned HTTP " + response.status);
+        const text = await response.text();
+        if (new TextEncoder().encode(text).byteLength > frontier.limits.max_response_bytes) {
+          throw new Error("Mirror frontier result exceeds bounded payload size");
+        }
+        const payload = JSON.parse(text);
+        const now = new Date().toISOString();
+        const updated = await env.DB.prepare(
+          "UPDATE worker_jobs SET state = 'succeeded', result_json = ?1, finished_at = ?2, heartbeat_at = ?2, lease_expires_at = NULL, updated_at = ?2, last_error = NULL WHERE id = ?3 AND state = 'running' AND lease_id = ?4",
+        ).bind(JSON.stringify(payload), now, jobId, leaseId).run();
+        if (!updated.success || (updated.meta.changes ?? 0) !== 1) throw new Error("frontier result lost its execution lease before persistence");
+        return;
+      } finally {
+        clearTimeout(timer);
+      }
     }
 
     // Autonomous discovery jobs are durable commissions to Mirror. Chanfana
