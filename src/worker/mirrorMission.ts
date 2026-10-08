@@ -68,7 +68,7 @@ export async function executeMirrorMission(
   const dispatchTime = new Date().toISOString();
   const payload = {
     ref: mission.target.ref,
-    client_payload: { mission: mission.mission },
+    inputs: { mission_json: JSON.stringify(mission.mission) },
   };
   await github<unknown>(
     token,
