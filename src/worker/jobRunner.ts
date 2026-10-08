@@ -1,4 +1,3 @@
-import { type WorkerResultType } from "./contracts";
 import { executePacket } from "./packetRunner";
 
 export async function runClaimedWorkerJob(
