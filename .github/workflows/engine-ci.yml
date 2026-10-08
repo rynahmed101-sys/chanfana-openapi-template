@@ -1,0 +1,26 @@
+name: Worker Engine CI
+
+on:
+  push:
+    branches: [engine]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+
+concurrency:
+  group: chanfana-openapi-template-engine-ci
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
