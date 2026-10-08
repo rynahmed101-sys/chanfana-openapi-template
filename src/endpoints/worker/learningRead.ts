@@ -1,19 +1,6 @@
-import { OpenAPIRoute, contentJson } from "chanfana";
+import { contentJson, OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { HandleArgs } from "../../types";
-
-const LearningArtifact = z.object({
-  id: z.string(),
-  artifactType: z.string(),
-  authority: z.string(),
-  sourceRepo: z.string(),
-  sourceRevision: z.string().nullable(),
-  correlationId: z.string(),
-  artifactSha256: z.string(),
-  artifact: z.unknown(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
 
 export class LearningRead extends OpenAPIRoute<HandleArgs> {
   public schema = {
@@ -31,7 +18,18 @@ export class LearningRead extends OpenAPIRoute<HandleArgs> {
         description: "Learning artifacts",
         ...contentJson(z.object({
           success: z.literal(true),
-          artifacts: z.array(LearningArtifact),
+          artifacts: z.array(z.object({
+            id: z.string(),
+            artifactType: z.string(),
+            authority: z.string(),
+            sourceRepo: z.string(),
+            sourceRevision: z.string().nullable(),
+            correlationId: z.string(),
+            artifactSha256: z.string(),
+            artifact: z.record(z.unknown()),
+            createdAt: z.string(),
+            updatedAt: z.string(),
+          })),
         })),
       },
       "401": { description: "Unauthorized" },
@@ -54,8 +52,9 @@ export class LearningRead extends OpenAPIRoute<HandleArgs> {
 
     const where = conditions.length ? " WHERE " + conditions.join(" AND ") : "";
     const rows = await c.env.DB.prepare(
-      "SELECT id, artifact_type, authority, source_repo, source_revision, correlation_id, artifact_sha256, artifact_json, created_at, updated_at FROM learning_artifacts"
-      + where + " ORDER BY created_at DESC LIMIT ?",
+      "SELECT id, artifact_type, authority, source_repo, source_revision, correlation_id, artifact_sha256, artifact_json, created_at, updated_at FROM learning_artifacts" +
+      where +
+      " ORDER BY created_at DESC, id DESC LIMIT ?",
     ).bind(...bindings, query.limit).all<{
       id: string;
       artifact_type: string;
@@ -69,19 +68,20 @@ export class LearningRead extends OpenAPIRoute<HandleArgs> {
       updated_at: string;
     }>();
 
-    const artifacts = (rows.results ?? []).map((row) => ({
-      id: row.id,
-      artifactType: row.artifact_type,
-      authority: row.authority,
-      sourceRepo: row.source_repo,
-      sourceRevision: row.source_revision,
-      correlationId: row.correlation_id,
-      artifactSha256: row.artifact_sha256,
-      artifact: JSON.parse(row.artifact_json),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
-
-    return { success: true as const, artifacts };
+    return {
+      success: true as const,
+      artifacts: (rows.results ?? []).map((row) => ({
+        id: row.id,
+        artifactType: row.artifact_type,
+        authority: row.authority,
+        sourceRepo: row.source_repo,
+        sourceRevision: row.source_revision,
+        correlationId: row.correlation_id,
+        artifactSha256: row.artifact_sha256,
+        artifact: JSON.parse(row.artifact_json) as Record<string, unknown>,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+    };
   }
 }

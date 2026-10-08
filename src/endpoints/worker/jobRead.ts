@@ -1,20 +1,7 @@
-import { OpenAPIRoute, contentJson } from "chanfana";
+import { OpenAPIRoute } from "chanfana";
+import { contentJson } from "chanfana";
 import { z } from "zod";
 import { HandleArgs } from "../../types";
-import { timingSnapshot, type JobTimingRow } from "../../worker/timing";
-
-const Timing = z.object({
-  startedAt: z.string().nullable(),
-  heartbeatAt: z.string().nullable(),
-  finishedAt: z.string().nullable(),
-  deadlineAt: z.string().nullable(),
-  estimatedDurationMs: z.number().int().nullable(),
-  elapsedMs: z.number().int(),
-  remainingMs: z.number().int().nullable(),
-  etaAt: z.string().nullable(),
-  overdue: z.boolean(),
-  attempt: z.number().int(),
-});
 
 const Job = z.object({
   id: z.string(),
@@ -26,13 +13,12 @@ const Job = z.object({
   hasResult: z.boolean(),
   resultId: z.string().nullable(),
   result: z.unknown().nullable(),
-  timing: Timing,
 });
 
 export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
   public schema = {
     tags: ["Worker"],
-    summary: "Inspect an autonomous worker job with timing and persisted result",
+    summary: "Inspect an autonomous worker job",
     request: {
       params: z.object({ id: z.string().min(1) }),
       query: z.object({ includeResult: z.coerce.boolean().default(true) }),
@@ -41,26 +27,32 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
       "200": { description: "Job found", ...contentJson(z.object({ success: z.literal(true), job: Job })) },
       "401": { description: "Unauthorized" },
       "404": { description: "Job not found" },
-      "413": { description: "Persisted result exceeds the bounded read size" },
-      "500": { description: "Persisted result is malformed JSON" },
     },
   };
 
   public async handle(c: HandleArgs[0]) {
     const { params, query } = await this.getValidatedData<typeof this.schema>();
     const row = await c.env.DB.prepare(
-      "SELECT id, request_id, capability_id, state, created_at, updated_at, result_json, started_at, heartbeat_at, finished_at, deadline_at, estimated_duration_ms, attempt FROM worker_jobs WHERE id = ?1"
-    ).bind(params.id).first<JobTimingRow & {
-      id: string; request_id: string; capability_id: string;
-      created_at: string; updated_at: string; result_json: string | null;
+      "SELECT id, request_id, capability_id, state, created_at, updated_at, result_json FROM worker_jobs WHERE id = ?1"
+    ).bind(params.id).first<{
+      id: string;
+      request_id: string;
+      capability_id: string;
+      state: string;
+      created_at: string;
+      updated_at: string;
+      result_json: string | null;
     }>();
 
-    if (!row) return c.json({ success: false, error: "Job not found" }, 404);
+    if (!row) {
+      return c.json({ success: false, error: "Job not found" }, 404);
+    }
 
     let result: unknown = null;
     let resultId: string | null = null;
     if (query.includeResult && row.result_json !== null) {
-      if (new TextEncoder().encode(row.result_json).byteLength > 1_500_000) {
+      const bytes = new TextEncoder().encode(row.result_json).byteLength;
+      if (bytes > 1_500_000) {
         return c.json({ success: false, error: "Persisted result exceeds bounded read size" }, 413);
       }
       try {
@@ -89,7 +81,6 @@ export class WorkerJobRead extends OpenAPIRoute<HandleArgs> {
         hasResult: row.result_json !== null,
         resultId,
         result,
-        timing: timingSnapshot(row),
       },
     };
   }
