@@ -1,10 +1,7 @@
 import { contentJson, OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { HandleArgs } from "../../types";
-import { WorkerResult } from "../../worker/contracts";
-import { runWorkerModel } from "../../worker/model";
-import { validateWorkerResultAgainstPacket } from "../../worker/guard";
-import { stateForWorkerResult } from "../../worker/state";
+import { executePacket } from "../../worker/packetRunner";
 
 export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
   public schema = {
@@ -19,7 +16,7 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
         ...contentJson(z.object({
           success: z.boolean(),
           state: z.string(),
-          result: WorkerResult.nullable(),
+          result: z.unknown().nullable(),
           errors: z.array(z.string()),
         })),
       },
@@ -54,41 +51,34 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
     try {
       const stored = JSON.parse(row.packet_json);
       const packet = stored.packet;
-      const result = await runWorkerModel(c.env, packet);
-      const errors = validateWorkerResultAgainstPacket(packet, result);
-      const nextState = stateForWorkerResult(result);
-
-      if (errors.length || nextState === "failed") {
-        const now = new Date().toISOString();
-        const updated = await c.env.DB.prepare(
-          "UPDATE worker_jobs SET state = 'failed', result_json = ?1, updated_at = ?2 WHERE id = ?3 AND state = 'running'"
-        ).bind(JSON.stringify(result), now, params.id).run();
-        if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
-          return c.json({ success: false, error: "Worker result lost a concurrent state transition" }, 409);
-        }
-        return { success: false, state: "failed", result, errors };
-      }
-
+      const execution = await executePacket(c.env, packet);
       const now = new Date().toISOString();
+
       const updated = await c.env.DB.prepare(
-        "UPDATE worker_jobs SET state = ?1, result_json = ?2, updated_at = ?3 WHERE id = ?4 AND state = 'running'"
-      ).bind(nextState, JSON.stringify(result), now, params.id).run();
+        "UPDATE worker_jobs SET state = ?1, result_json = ?2, finished_at = ?3, heartbeat_at = ?3, lease_id = NULL, lease_expires_at = NULL, updated_at = ?3, last_error = ?4 WHERE id = ?5 AND state = 'running'",
+      ).bind(
+        execution.state,
+        JSON.stringify(execution.result),
+        now,
+        execution.errors.length ? execution.errors.join("; ") : null,
+        params.id,
+      ).run();
 
       if (!updated.success || (updated.meta.changes ?? 0) !== 1) {
         return c.json({ success: false, error: "Worker result lost a concurrent state transition" }, 409);
       }
 
       return {
-        success: nextState === "succeeded",
-        state: nextState,
-        result,
-        errors,
+        success: execution.state === "succeeded",
+        state: execution.state,
+        result: execution.result,
+        errors: execution.errors,
       };
     } catch (error) {
       const now = new Date().toISOString();
       await c.env.DB.prepare(
-        "UPDATE worker_jobs SET state = 'failed', updated_at = ?1 WHERE id = ?2"
-      ).bind(now, params.id).run();
+        "UPDATE worker_jobs SET state = 'failed', lease_id = NULL, lease_expires_at = NULL, updated_at = ?1, last_error = ?2 WHERE id = ?3 AND state = 'running'"
+      ).bind(now, error instanceof Error ? error.message : String(error), params.id).run();
       const message = error instanceof Error ? error.message : String(error);
       return c.json({ success: false, error: message }, 503);
     }
