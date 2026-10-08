@@ -1,4 +1,4 @@
-import { type WorkerResultType, type WorkerPacketType } from "./contracts";
+import { WorkerPacket, type WorkerResultType, type WorkerPacketType } from "./contracts";
 import { runWorkerModel } from "./model";
 import { validateWorkerResultAgainstPacket } from "./guard";
 import { stateForWorkerResult } from "./state";
@@ -8,6 +8,10 @@ import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } fro
 import { validateDiscoveryJobEnvelope, type DiscoveryJobEnvelopeType } from "./discoveryEnvelope";
 import { validateFrontierJobEnvelope, type FrontierJobEnvelopeType } from "./frontierEnvelope";
 import { storeLearningArtifact } from "./learningLedger";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 export type PacketExecution =
   | { kind: "special"; state: "succeeded"; result: unknown; errors: string[] }
@@ -52,7 +56,7 @@ export async function executePacket(
   env: Env,
   packet: unknown,
 ): Promise<PacketExecution> {
-  if (packet?.schema_version === "automate.verification_job.v1") {
+  if (isRecord(packet) && packet.schema_version === "automate.verification_job.v1") {
     const verification: VerificationJobEnvelopeType = validateVerificationJobEnvelope(packet);
     if (!env.VERIFICATION_ENGINE_JOB_TOKEN || !env.VERIFICATION_ENGINE_ENDPOINT) {
       throw new Error("Verification engine endpoint or authentication is not configured");
@@ -71,7 +75,7 @@ export async function executePacket(
     return { kind: "special", state: "succeeded", result: payload, errors: [] };
   }
 
-  if (packet?.schema_version === "automate.learning_handoff.v1") {
+  if (isRecord(packet) && packet.schema_version === "automate.learning_handoff.v1") {
     const handoff: LearningHandoffEnvelopeType = validateLearningHandoffEnvelope(packet);
     const stored = await storeLearningArtifact(env, handoff);
     const payload = {
@@ -89,7 +93,7 @@ export async function executePacket(
     return { kind: "special", state: "succeeded", result: payload, errors: [] };
   }
 
-  if (packet?.schema_version === "mirror.research_job.v1") {
+  if (isRecord(packet) && packet.schema_version === "mirror.research_job.v1") {
     const research: ResearchJobEnvelopeType = validateResearchJobEnvelope(packet);
     if (!env.MIRROR_RESEARCH_ENDPOINT || !env.MIRROR_RESEARCH_JOB_TOKEN) {
       throw new Error("Mirror research endpoint or authentication is not configured");
@@ -115,7 +119,7 @@ export async function executePacket(
     return { kind: "special", state: "succeeded", result: payload, errors: [] };
   }
 
-  if (packet?.schema_version === "mirror.frontier_job.v1") {
+  if (isRecord(packet) && packet.schema_version === "mirror.frontier_job.v1") {
     const frontier: FrontierJobEnvelopeType = validateFrontierJobEnvelope(packet);
     if (!env.MIRROR_FRONTIER_ENDPOINT || !env.MIRROR_FRONTIER_JOB_TOKEN) {
       throw new Error("Mirror frontier endpoint or authentication is not configured");
@@ -134,7 +138,7 @@ export async function executePacket(
     return { kind: "special", state: "succeeded", result: payload, errors: [] };
   }
 
-  if (packet?.schema_version === "mirror.discovery_job.v1") {
+  if (isRecord(packet) && packet.schema_version === "mirror.discovery_job.v1") {
     const discovery: DiscoveryJobEnvelopeType = validateDiscoveryJobEnvelope(packet);
     if (!env.MIRROR_DISCOVERY_ENDPOINT || !env.MIRROR_DISCOVERY_JOB_TOKEN) {
       throw new Error("Mirror discovery endpoint or authentication is not configured");
@@ -158,7 +162,11 @@ export async function executePacket(
     return { kind: "special", state: "succeeded", result: payload, errors: [] };
   }
 
-  const workerPacket = packet as WorkerPacketType["packet"];
+  const parsedWorker = WorkerPacket.safeParse(packet);
+  if (!parsedWorker.success) {
+    throw new Error("Invalid Automate worker packet: " + parsedWorker.error.message);
+  }
+  const workerPacket: WorkerPacketType["packet"] = parsedWorker.data.packet;
   const result: WorkerResultType = await runWorkerModel(env, workerPacket);
   const errors = validateWorkerResultAgainstPacket(workerPacket, result);
   const state = errors.length ? "failed" : stateForWorkerResult(result);
