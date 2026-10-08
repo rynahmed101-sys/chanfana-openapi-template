@@ -5,9 +5,11 @@ import { stateForWorkerResult } from "./state";
 import { validateResearchJobEnvelope, type ResearchJobEnvelopeType } from "./researchEnvelope";
 import { validateVerificationJobEnvelope, type VerificationJobEnvelopeType } from "./verificationEnvelope";
 import { validateLearningHandoffEnvelope, type LearningHandoffEnvelopeType } from "./learningEnvelope";
+import { validateMirrorMissionEnvelope, type MirrorMissionEnvelopeType } from "./mirrorMissionEnvelope";
 import { validateDiscoveryJobEnvelope, type DiscoveryJobEnvelopeType } from "./discoveryEnvelope";
 import { validateFrontierJobEnvelope, type FrontierJobEnvelopeType } from "./frontierEnvelope";
 import { storeLearningArtifact } from "./learningLedger";
+import { executeMirrorMission } from "./mirrorMission";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -91,6 +93,12 @@ export async function executePacket(
       stored_at: new Date().toISOString(),
     };
     return { kind: "special", state: "succeeded", result: payload, errors: [] };
+  }
+
+  if (isRecord(packet) && packet.schema_version === "mirror.mission_job.v1") {
+    const mission: MirrorMissionEnvelopeType = validateMirrorMissionEnvelope(packet);
+    const result = await executeMirrorMission(env, mission);
+    return { kind: "special", state: "succeeded", result, errors: [] };
   }
 
   if (isRecord(packet) && packet.schema_version === "mirror.research_job.v1") {
