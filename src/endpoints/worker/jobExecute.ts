@@ -82,3 +82,5 @@ export class WorkerJobExecute extends OpenAPIRoute<HandleArgs> {
       const message = error instanceof Error ? error.message : String(error);
       return c.json({ success: false, error: message }, 503);
     }
+  }
+}
