@@ -9,16 +9,11 @@ describe("frontier job envelope", () => {
       action_cycle_id: "cycle_12345678",
       execution_kind: "mirror_frontier",
       target: { mirror_endpoint: "https://mirror.example/frontier" },
-      capability: {
-        id: "stage1b.taylor",
-        name: "Taylor expansion",
-        task: "Implement bounded capability",
-        base_revision: "abcdef1234567",
-      },
+      capability: { id: "stage1b.test", name: "Test capability", task: "Implement", base_revision: "abcdef1234567" },
       mission: {
         repair_required: false,
-        current_backlog: ["stage1b.taylor"],
-        ledger_frontier: ["stage1b.taylor"],
+        current_backlog: ["stage1b.test"],
+        ledger_frontier: ["stage1b.test"],
         automate_requests: [],
         discovery_allowed: false,
         ledger_hash: null,
@@ -33,10 +28,7 @@ describe("frontier job envelope", () => {
         remote_git_mutation: false,
         canonical_mutation: false,
       },
-      provenance: {
-        correlation_id: "corr_12345678",
-        parent_ids: ["stage1b.taylor"],
-      },
+      provenance: { correlation_id: "corr_12345678", parent_ids: ["stage1b.test"] },
     });
     expect(result.permissions.canonical_mutation).toBe(false);
     expect(result.permissions.remote_git_mutation).toBe(false);
