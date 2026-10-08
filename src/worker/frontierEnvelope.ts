@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-/**
- * Full Mirror frontier mission. Chanfana transports and bounds it.
- * Mirror performs tool use. Automate remains the authority for promotion.
- */
 export const FrontierAction = z.enum([
   "repair",
   "implement",
