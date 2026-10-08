@@ -84,7 +84,7 @@ export async function executeMirrorMission(
       token,
       "/repos/" + mission.target.repository + "/actions/workflows/" +
         encodeURIComponent(mission.target.workflow) +
-        "/runs?event=repository_dispatch&branch=" +
+        "/runs?event=workflow_dispatch&branch=" +
         encodeURIComponent(mission.target.ref) + "&per_page=10",
     );
     run = runs.workflow_runs
